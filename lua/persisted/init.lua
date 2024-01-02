@@ -101,6 +101,7 @@ function M.get_branch(dir)
     vim.fn.system("git -C \"" .. dir .. "\" rev-parse 2>/dev/null")
 
     local git_enabled = (vim.v.shell_error == 0)
+    local use_fallback_branch = config.options.use_fallback_branch
 
     if git_enabled then
       local git_branch = vim.fn.systemlist("git -C \"" .. dir .. "\" rev-parse --abbrev-ref HEAD 2>/dev/null")
@@ -112,7 +113,7 @@ function M.get_branch(dir)
         -- Try to load the session for the current branch
         if vim.fn.filereadable(branch_session) ~= 0 then
           return branch
-        else
+        elseif use_fallback_branch then
           vim.api.nvim_echo({
             { "[Persisted.nvim]\n", "Question" },
             { "Could not load a session for branch " },
