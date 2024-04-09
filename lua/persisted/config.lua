@@ -5,6 +5,7 @@ local defaults = {
   silent = false, -- silent nvim message when sourcing session file
 
   use_git_branch = false, -- create session files based on the branch of a git enabled repository
+  use_fallback_branch = true, -- fallback to default_branch if the current branch is not found
   branch_separator = "@@", -- string used to separate session directory name from branch name
   default_branch = "main", -- the branch to load if a session file is not found for the current branch
 
