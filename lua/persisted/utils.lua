@@ -8,7 +8,7 @@ local fp_sep = vim.loop.os_uname().sysname:lower():match("windows") and "\\" or 
 --@return string
 local function echoerr(msg, error)
   vim.api.nvim_echo({
-    { "[persisted.nvim]: ", "ErrorMsg" },
+    { "[Persisted.nvim]: ", "ErrorMsg" },
     { msg, "WarningMsg" },
     { error, "Normal" },
   }, true, {})
@@ -82,7 +82,20 @@ end
 ---@return boolean
 function M.dirs_match(dir, dirs_table)
   dir = vim.fn.expand(dir)
-  return dirs_table
+  return M.table_match(dir, dirs_table, function(pattern)
+    return escape_pattern(vim.fn.expand(pattern))
+  end)
+end
+
+---Check if a string matches and entry in a given table
+---@param needle string
+---@param heystack table
+---@return boolean
+function M.table_match(needle, heystack, escape_fct)
+  if needle == nil then
+    return false
+  end
+  return heystack
     and next(vim.tbl_filter(function(pattern)
       if pattern.exact then
         -- The pattern is actually a table
@@ -92,11 +105,14 @@ function M.dirs_match(dir, dirs_table)
         if pattern:sub(-1) == fp_sep and pattern:len() > 1 then
           pattern = pattern:sub(1, -2)
         end
-        return dir == pattern
+        return needle == pattern
       else
-        return dir:find(escape_pattern(vim.fn.expand(pattern)))
+        if escape_fct then
+          pattern = escape_fct(pattern)
+        end
+        return needle:match(pattern)
       end
-    end, dirs_table))
+    end, heystack))
 end
 
 ---Get the directory pattern based on OS

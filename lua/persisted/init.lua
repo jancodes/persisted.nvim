@@ -79,6 +79,19 @@ local function ignore_dir(dir)
   return utils.dirs_match(dir, ignored_dirs)
 end
 
+---Is the current branch ignored for auto-saving and loading?
+---@param dir string Branch to be used for the session
+---@return boolean
+local function ignore_branch(branch)
+  local ignored_branches = config.options.ignored_branches
+
+  if ignored_branches == nil then
+    return false
+  end
+
+  return utils.table_match(branch, ignored_branches) ~= nil
+end
+
 ---Get the session that was saved last
 ---@return string
 local function get_last()
@@ -91,6 +104,23 @@ local function get_last()
   return sessions[1]
 end
 
+---Get the current Git branch name, untouched
+---@param dir? string Directory to be used for the session
+---@return string|nil
+local function get_branchname(dir)
+  dir = dir or session_dir()
+  vim.fn.system('git -C "' .. dir .. '" rev-parse 2>/dev/null')
+
+  local git_enabled = (vim.v.shell_error == 0)
+
+  if git_enabled then
+    local git_branch = vim.fn.systemlist('git -C "' .. dir .. '" rev-parse --abbrev-ref HEAD 2>/dev/null')
+    return git_branch[1]
+  end
+
+  return nil
+end
+
 ---Get the current Git branch
 ---@param dir? string Directory to be used for the session
 ---@return string|nil
@@ -98,13 +128,13 @@ function M.get_branch(dir)
   dir = dir or session_dir()
 
   if config.options.use_git_branch then
-    vim.fn.system("git -C \"" .. dir .. "\" rev-parse 2>/dev/null")
+    vim.fn.system('git -C "' .. dir .. '" rev-parse 2>/dev/null')
 
     local git_enabled = (vim.v.shell_error == 0)
     local use_fallback_branch = config.options.use_fallback_branch
 
     if git_enabled then
-      local git_branch = vim.fn.systemlist("git -C \"" .. dir .. "\" rev-parse --abbrev-ref HEAD 2>/dev/null")
+      local git_branch = vim.fn.systemlist('git -C "' .. dir .. '" rev-parse --abbrev-ref HEAD 2>/dev/null')
 
       if vim.v.shell_error == 0 then
         local branch = config.options.branch_separator .. git_branch[1]:gsub("/", "%%")
@@ -114,15 +144,14 @@ function M.get_branch(dir)
         if vim.fn.filereadable(branch_session) ~= 0 then
           return branch
         elseif use_fallback_branch then
-          vim.api.nvim_echo({
-            { "[Persisted.nvim]\n", "Question" },
-            { "Could not load a session for branch " },
-            { git_branch[1] .. "\n", "WarningMsg" },
-            { "Trying to load a session for branch " },
-            { config.options.default_branch, "Title" },
-            { " ..." },
-          }, true, {})
-
+          vim.notify(
+            string.format("[Persisted.nvim]: Trying to load a session for branch %s", config.options.default_branch),
+            vim.log.levels.INFO
+          )
+          vim.notify(
+            string.format("[Persisted.nvim]: Could not load a session for branch %s.", git_branch[1]),
+            vim.log.levels.WARN
+          )
           vim.g.persisted_branch_session = branch_session
           return config.options.branch_separator .. config.options.default_branch
         end
@@ -156,10 +185,12 @@ end
 function M.setup(opts)
   config.setup(opts)
   local dir = session_dir()
+  local branch = get_branchname()
 
   if
     config.options.autosave
     and (allow_dir(dir) and not ignore_dir(dir) and vim.g.persisting == nil)
+    and not ignore_branch(branch)
     and args_check()
   then
     M.start()
@@ -173,6 +204,7 @@ end
 function M.load(opt, dir)
   opt = opt or {}
   dir = dir or session_dir()
+  local branch = get_branchname()
 
   local session = opt.session or (opt.last and get_last() or get_current(dir))
 
@@ -187,18 +219,7 @@ function M.load(opt, dir)
     end
   end
 
-  if session and not session_exists then
-    vim.api.nvim_echo({
-      { "[Persisted.nvim]\n", "Question" },
-      { "Could not find a session for " },
-      { vim.fn.getcwd() .. "\n", "WarningMsg" },
-      { "As per " },
-      { "https://github.com/olimorris/persisted.nvim/discussions/103", "WarningMsg" },
-      { " you may need to remove the branch from the name" },
-    }, true, {})
-  end
-
-  if config.options.autosave and (allow_dir(dir) and not ignore_dir(dir)) then
+  if config.options.autosave and (allow_dir(dir) and not ignore_dir(dir)) and not ignore_branch(branch) then
     M.start()
   end
 end
@@ -207,9 +228,10 @@ end
 ---@return nil
 function M.autoload()
   local dir = session_dir()
+  local branch = get_branchname()
 
   if config.options.autoload and args_check() then
-    if allow_dir(dir) and not ignore_dir(dir) then
+    if allow_dir(dir) and not ignore_dir(dir) and not ignore_branch(branch) then
       M.load({}, dir)
     end
   end
@@ -260,7 +282,11 @@ function M.save(opt, dir)
     end
 
     -- Do not save the session if the callback returns false...unless it's forced
-    if type(config.options.should_autosave) == "function" and not config.options.should_autosave() then
+    if
+      not opt.force
+      and type(config.options.should_autosave) == "function"
+      and not config.options.should_autosave()
+    then
       return
     end
   end
@@ -295,6 +321,7 @@ end
 ---@return nil
 function M.toggle(dir)
   vim.api.nvim_exec_autocmds("User", { pattern = "PersistedToggled" })
+
   dir = dir or session_dir()
 
   if vim.g.persisting == nil then

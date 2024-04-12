@@ -37,12 +37,13 @@ Install the plugin with your preferred package manager:
     -- Lua
     {
       "olimorris/persisted.nvim",
+      lazy = false, -- make sure the plugin is always loaded at startup
       config = true
     }
 <
 
 
-  **Note**The `lazy = true` option may be useful if you use a dashboard
+  [!NOTE] Setting `lazy = true` option may be useful if you use a dashboard
 **Packer**
 
 >lua
@@ -60,7 +61,7 @@ Install the plugin with your preferred package manager:
 >vim
     " Vim Script
     Plug 'olimorris/persisted.nvim'
-
+    
     lua << EOF
       require("persisted").setup {
         -- your configuration comes here
@@ -160,8 +161,14 @@ The plugin comes with the following defaults:
       follow_cwd = true, -- change session file name to match current working directory if it changes
       allowed_dirs = nil, -- table of dirs that the plugin will auto-save and auto-load from
       ignored_dirs = nil, -- table of dirs that are ignored when auto-saving and auto-loading
+      ignored_branches = nil, -- table of branch patterns that are ignored for auto-saving and auto-loading
       telescope = {
         reset_prompt = true, -- Reset the Telescope prompt after an action?
+        mappings = { -- table of mappings for the Telescope extension
+          change_branch = "<c-b>",
+          copy_session = "<c-c>",
+          delete_session = "<c-d>",
+        },
       },
     })
 <
@@ -174,7 +181,7 @@ As the plugin uses Vim’s `:mksession` command then you may change the
 Please see `:h sessionoptions` for more information.
 
 
-  **Note**The author uses: `vim.o.sessionoptions =
+  [!NOTE] The author uses: `vim.o.sessionoptions =
   "buffers,curdir,folds,tabpages,winpos,winsize"`
 
 SESSION SAVE LOCATION ~
@@ -189,7 +196,7 @@ configuration option. For example:
 <
 
 
-  **Note**The plugin may be unable to find existing sessions if the `save_dir`
+  [!NOTE] The plugin may be unable to find existing sessions if the `save_dir`
   value is changed
 
 GIT BRANCHING ~
@@ -238,7 +245,7 @@ Of course, if you wish to manually save the session when autosaving is
 disabled, the `:SessionSave` command can be used.
 
 
-  **Note**If `autosave = false` then the `should_autosave` callback will not be
+  [!NOTE] If `autosave = false` then the `should_autosave` callback will not be
   executed.
 
 AUTOLOADING ~
@@ -268,7 +275,7 @@ Autoloading can be further controlled for certain directories by specifying
 `allowed_dirs` and `ignored_dirs`.
 
 
-  **Note**Autoloading will not occur if the plugin is lazy loaded or a user opens
+  [!NOTE] Autoloading will not occur if the plugin is lazy loaded or a user opens
   Neovim with arguments other than a single directory argument. For example:
   `nvim some_file.rb` will not result in autoloading but `nvim
   some/existing/path` or `nvim .` will.
@@ -288,7 +295,7 @@ By default, the session name will match the current working directory:
 <
 
 
-  **Note**If `follow_cwd = false` the session name is stored upon loading under
+  [!NOTE] If `follow_cwd = false` the session name is stored upon loading under
   the global variable `vim.g.persisting_session`. This variable can be manually
   adjusted if changes to the session name are needed. Alternatively, if
   `follow_cwd = true` then `vim.g.persisting_session = nil`.
@@ -311,7 +318,7 @@ Specifying `~/Code` will autosave and autoload from that directory as well as
 all its sub-directories.
 
 
-  **Note**If `allowed_dirs` is left at its default value and `autosave` and/or
+  [!NOTE] If `allowed_dirs` is left at its default value and `autosave` and/or
   `autoload` are set to `true`, then the plugin will autoload/autosave from _any_
   directory
 
@@ -352,6 +359,21 @@ their default setting (ignoring all listed directory and its children), however
 `/` and `/tmp` will only ignore those directories exactly.
 
 
+IGNORED BRANCHES ~
+
+You may specify a table of patterns that match against branches for which the
+plugin will **never** autosave and autoload from:
+
+>lua
+    require("persisted").setup({
+      ignored_branches = {
+        "^master",
+        "feature/%u"
+      },
+    })
+<
+
+
 EVENTS / CALLBACKS ~
 
 The plugin fires events at various points during its lifecycle:
@@ -379,14 +401,14 @@ session, saving the current session before clearing all of the open buffers:
 
 >lua
     local group = vim.api.nvim_create_augroup("PersistedHooks", {})
-
+    
     vim.api.nvim_create_autocmd({ "User" }, {
       pattern = "PersistedTelescopeLoadPre",
       group = group,
       callback = function(session)
         -- Save the currently loaded session using a global variable
         require("persisted").save({ session = vim.g.persisted_loaded_session })
-
+    
         -- Delete all of the open buffers
         vim.api.nvim_input("<ESC>:%bd!<CR>")
       end,
@@ -421,7 +443,7 @@ To consume this data, use the `session.data` table in your autocmd:
 <
 
 
-  **Note**This data is available for the `PersistedLoad`, `PersistedDelete` and
+  [!NOTE] This data is available for the `PersistedLoad`, `PersistedDelete` and
   `PersistedTelescope` events
 
 LICENSE                                               *persisted.nvim-license*
